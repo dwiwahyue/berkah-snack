@@ -34,3 +34,37 @@ export async function logout() {
   await supabase.auth.signOut();
   redirect("/admin/login");
 }
+
+/**
+ * US-05: Ganti password admin yang sedang login.
+ * Validasi di server: minimal 8 karakter, harus cocok dengan konfirmasi.
+ */
+export async function gantiPassword(prevState, formData) {
+  const passwordBaru = formData.get("password_baru");
+  const konfirmasi = formData.get("konfirmasi_password");
+
+  if (!passwordBaru || !konfirmasi) {
+    return { error: "Semua kolom wajib diisi." };
+  }
+  if (passwordBaru.length < 8) {
+    return { error: "Password baru minimal 8 karakter." };
+  }
+  if (passwordBaru !== konfirmasi) {
+    return { error: "Konfirmasi password tidak cocok." };
+  }
+
+  const supabase = await buatSupabaseAuth();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/admin/login");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: passwordBaru });
+
+  if (error) {
+    return { error: "Gagal mengganti password: " + error.message };
+  }
+
+  return { sukses: "Password berhasil diperbarui." };
+}
