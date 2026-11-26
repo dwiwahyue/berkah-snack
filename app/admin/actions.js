@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { buatSupabaseAuth } from "@/lib/supabase-auth";
 
@@ -83,4 +84,108 @@ export async function gantiPassword(prevState, formData) {
   }
 
   return { sukses: "Password berhasil diperbarui." };
+}
+
+/**
+ * Helper internal: baca dan validasi field form produk.
+ */
+function ambilDataProduk(formData) {
+  const nama = String(formData.get("nama") ?? "").trim();
+  const hargaRaw = formData.get("harga");
+  const harga = Number(hargaRaw);
+  const kategori = String(formData.get("kategori") ?? "").trim() || null;
+  const foto_url = String(formData.get("foto_url") ?? "").trim() || null;
+  const deskripsi = String(formData.get("deskripsi") ?? "").trim() || null;
+
+  if (!nama) {
+    return { error: "Nama produk wajib diisi." };
+  }
+  if (hargaRaw === null || hargaRaw === "" || Number.isNaN(harga) || harga < 0) {
+    return { error: "Harga harus berupa angka 0 atau lebih." };
+  }
+
+  return {
+    data: { nama, harga: Math.round(harga), kategori, foto_url, deskripsi },
+  };
+}
+
+/**
+ * US-08: Tambah produk baru ke Supabase.
+ */
+export async function tambahProduk(prevState, formData) {
+  let supabase;
+  try {
+    ({ supabase } = await periksaLogin());
+  } catch {
+    return { error: "Akses ditolak: Anda belum login." };
+  }
+
+  const parsed = ambilDataProduk(formData);
+  if (parsed.error) {
+    return { error: parsed.error };
+  }
+
+  const { error } = await supabase.from("produk").insert(parsed.data);
+
+  if (error) {
+    return { error: "Gagal menyimpan produk: " + error.message };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect("/admin");
+}
+
+/**
+ * US-09: Ubah data produk yang sudah ada di Supabase.
+ */
+export async function ubahProduk(prevState, formData) {
+  let supabase;
+  try {
+    ({ supabase } = await periksaLogin());
+  } catch {
+    return { error: "Akses ditolak: Anda belum login." };
+  }
+
+  const id = formData.get("id");
+  if (!id) {
+    return { error: "ID produk tidak ditemukan." };
+  }
+
+  const parsed = ambilDataProduk(formData);
+  if (parsed.error) {
+    return { error: parsed.error };
+  }
+
+  const { error } = await supabase.from("produk").update(parsed.data).eq("id", id);
+
+  if (error) {
+    return { error: "Gagal menyimpan perubahan: " + error.message };
+  }
+
+  revalidatePath("/");
+  revalidatePath(`/produk/${id}`);
+  revalidatePath("/admin");
+  redirect("/admin");
+}
+
+/**
+ * US-10: Hapus produk dari Supabase.
+ */
+export async function hapusProduk(formData) {
+  const { supabase } = await periksaLogin();
+
+  const id = formData.get("id");
+  if (!id) {
+    throw new Error("ID produk tidak ditemukan.");
+  }
+
+  const { error } = await supabase.from("produk").delete().eq("id", id);
+
+  if (error) {
+    throw new Error("Gagal menghapus produk: " + error.message);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
 }

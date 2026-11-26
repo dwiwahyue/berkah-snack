@@ -1,15 +1,15 @@
 import NavAdmin from "@/components/NavAdmin";
 import TabelProduk from "@/components/TabelProduk";
 import Tombol from "@/components/Tombol";
-import { buatSupabaseServer } from "@/lib/supabase";
+import { buatSupabaseAuth } from "@/lib/supabase-auth";
 
-// US-06: halaman ini dilindungi proxy.js — hanya admin yang sudah login bisa membuka.
+// US-06 & US-07: halaman ini dilindungi proxy.js dan mengambil daftar produk dari Supabase.
 export default async function HalamanAdmin() {
-  // US-07 (bonus): daftar produk masih memakai data contoh, belum dari database.
-  // const daftarProduk = produkContoh;
-  const { data: produk, error } = await buatSupabaseServer
+  const supabase = await buatSupabaseAuth();
+  const { data: produk, error } = await supabase
     .from("produk")
-    .select("*");
+    .select("*")
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Gagal mengambil data:", error.message);
@@ -24,7 +24,7 @@ export default async function HalamanAdmin() {
         {/* US-08 (bonus): tambah produk */}
         <Tombol href="/admin/produk/baru">Tambah produk</Tombol>
       </div>
-      <TabelProduk daftarProduk={produk} />
+      <TabelProduk daftarProduk={produk ?? []} />
     </div>
   );
 }
