@@ -26,6 +26,22 @@ export async function login(prevState, formData) {
 }
 
 /**
+ * Helper internal: periksa sesi login di server.
+ * Jika tidak ada sesi, lempar error agar Server Action menolak aksi.
+ * Redirect tidak dipakai di sini supaya caller bisa mengembalikan pesan error.
+ */
+async function periksaLogin() {
+  const supabase = await buatSupabaseAuth();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Akses ditolak: Anda belum login.");
+  }
+  return { supabase, user };
+}
+
+/**
  * US-04: Logout admin — hapus sesi lalu arahkan ke halaman login.
  * Dipanggil dari tombol Keluar di NavAdmin.
  */
@@ -53,10 +69,10 @@ export async function gantiPassword(prevState, formData) {
     return { error: "Konfirmasi password tidak cocok." };
   }
 
-  const supabase = await buatSupabaseAuth();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
+  let supabase;
+  try {
+    ({ supabase } = await periksaLogin());
+  } catch {
     redirect("/admin/login");
   }
 
